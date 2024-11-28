@@ -689,6 +689,6 @@ leaflet() |>
   )
 ```
 
-# Mapa adicional del modelo con las capas ERA5 de precipitación y la capa de altitud de terra 
+
 
 
