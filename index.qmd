@@ -2,6 +2,7 @@
 title: "Tarea 3 Modelo de nicho de la especie Pharomachrus mocinno (Quetzal)"
 format: html
 author: Mariana de los Ángeles Morales Morales
+theme: minty
 toc: true
 toc_depth: 2
 ---
@@ -640,6 +641,19 @@ colores_prediccion_binaria <- colorFactor(
   na.color = "transparent"
 )
 
+# Paletas de colores para temperatura y precipitación
+colores_temperatura <- colorNumeric(
+  palette = c("blue", "yellow", "red"),
+  values(clima$wc2.1_10m_bio_1),
+  na.color = "transparent"
+)
+
+colores_precipitacion <- colorNumeric(
+  palette = c("lightblue", "green", "darkgreen"),
+  values(clima$wc2.1_10m_bio_12),
+  na.color = "transparent"
+)
+
 # Mapa
 leaflet() |>
   addTiles(group = "Mapa general") |>
@@ -650,6 +664,18 @@ leaflet() |>
   addProviderTiles(
     providers$CartoDB.Positron, 
     group = "Mapa blanco"
+  ) |>
+  addRasterImage( # capa raster de temperatura
+    clima$wc2.1_10m_bio_1,
+    colors = colores_temperatura, # paleta de colores
+    opacity = 0.6,
+    group = "Temperatura",
+  ) |>
+  addRasterImage( # capa raster de precipitación
+    clima$wc2.1_10m_bio_12,
+    colors = colores_precipitacion, # paleta de colores
+    opacity = 0.6,
+    group = "Precipitación",
   ) |>
   addRasterImage(
     prediccion_binaria,
@@ -671,7 +697,7 @@ leaflet() |>
       paste0("<a href='", presencia$occurrenceID, "'>Más información</a>"),
       sep = '<br/>'
     ),
-    group = "Registros de Bradypus variegatus"
+    group = "Registros de Pharomachrus mocinno"
   ) |>
   addLegend(
     title = "Modelo de distribución binario",
@@ -680,15 +706,41 @@ leaflet() |>
     position = "bottomright",
     group = "Modelo de distribución binario"
   ) |>
+  addLegend(
+    title = "Temperatura",
+    values = values(clima$wc2.1_10m_bio_1),
+    pal = colores_temperatura,
+    position = "bottomleft",
+    group = "Temperatura"
+  ) |>
+  addLegend(
+    title = "Precipitación",
+    values = values(clima$wc2.1_10m_bio_12),
+    pal = colores_precipitacion,
+    position = "bottomleft",
+    group = "Precipitación"
+  ) |>
   addLayersControl(
     baseGroups = c("Mapa general", "Imágenes satelitales", "Mapa blanco"),
     overlayGroups = c(
+      "Temperatura",
+      "Precipitación",
       "Modelo de distribución binario",
       "Registros de Pharomachrus mocinno"
     )
   )
 ```
 
+# Comentario final 
 
+Este trabajo comienza con la instalación y carga de paquetes necesarios en R, como rgbif para acceder a datos de GBIF, dismo para modelado de distribución de especies, y leaflet para mapas interactivos. Se selecciona la especie Pharomachrus mocinno y se consulta en GBIF para obtener registros de su presencia, los cuales se extraen y guardan en un archivo CSV.
+
+Posteriormente, se leen los datos de presencia, se transforman en formato espacial utilizando sf y se visualizan. Se genera un gráfico de barras para mostrar la cantidad de registros de presencia por país y un gráfico de pastel para la distribución porcentual por provincia en Costa Rica. Además, se utiliza leaflet para crear un mapa interactivo con los registros de la especie.
+
+Se consulta el clima y se recortan las variables climáticas (temperatura y precipitación) a la extensión del área de estudio. Luego, se genera un mapa combinado de la distribución de la especie junto con las variables climáticas utilizando las paletas de colores adecuadas.
+
+Para la creación del modelo de nicho, se seleccionan aleatoriamente los registros de presencia para entrenamiento y evaluación. Se entrena el modelo MaxEnt con las variables climáticas y se genera un mapa de idoneidad del hábitat para la especie. Posteriormente, se evalúa el modelo utilizando puntos de presencia y ausencias simuladas para obtener resultados estadísticos los cuales fueron favorables con la curva ROC y el AUC.
+
+Finalmente, se presenta el mapa de idoneidad del hábitat, junto con los análisis estadísticos y la validación del modelo para predecir la distribución potencial de la especie en función de las variables climáticas. Donde es muy visible que la distribución de los quetzales depende mucho de la temperatura y por lo tanto de la altura, por lo que en las zonas altas se puede predecir una mayor presencia de esta especie.
 
 
