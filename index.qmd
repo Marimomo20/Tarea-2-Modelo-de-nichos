@@ -1,0 +1,694 @@
+---
+title: "Tarea 3 Modelo de nicho de la especie Pharomachrus mocinno (Quetzal)"
+format: html
+author: Mariana de los Ángeles Morales Morales
+toc: true
+toc_depth: 2
+---
+
+### Instalación de paquetes
+
+Esto se hace en la terminal
+
+```{r}
+#| label: Instalacion de paquetes
+#| message: false
+#| warning: false
+
+#install.packages("rJava")
+# Paquete para acceder datos en GBIF
+#install.packages("rgbif")
+
+# Paquete para acceder datos geoespaciales
+#install.packages("geodata")
+
+# Paquete para mapas interactivos
+#install.packages("leaflet")
+
+# Paquete para modelado de distribución de especies
+#install.packages("dismo")
+
+# install.packages("RColorBrewer")
+```
+
+### Carga de paquetes
+
+```{r}
+#| label: Carga de paquetes
+#| message: false
+#| warning: false
+
+# Colección de paquetes de Tidyverse
+library(tidyverse)
+
+# Estilos para ggplot2
+library(ggthemes)
+
+# Paletas de colores de RColorBrewer
+library(RColorBrewer)
+
+# Paletas de colores de viridis
+library(viridisLite)
+
+# Gráficos interactivos
+library(plotly)
+
+# Manejo de datos vectoriales
+library(sf)
+
+# Manejo de datos raster
+library(terra)
+
+# Manejo de datos raster
+library(raster)
+
+# Mapas interactivos
+library(leaflet)
+
+# Acceso a datos en GBIF
+library(rgbif)
+
+# Datos geoespaciales
+library(geodata)
+
+# Modelado de distribución de especies
+library(dismo)
+
+# Instalar y cargar el paquete RColorBrewer si no lo tienes
+library(RColorBrewer)
+
+# Datos de precipitación y temperatura (ERA5)
+library(pRecipe)
+
+# Cargar el paquete
+library(elevatr)
+```
+
+### Selección de la especie
+
+```{r}
+#| label: Seleccion de especie
+#| message: false
+#| warning: false
+
+# Nombre de la especie
+especie <- "Pharomachrus mocinno La Llave, 1832"
+
+# Consulta a GBIF
+respuesta <- occ_search(
+  scientificName = especie, 
+  hasCoordinate = TRUE,
+  hasGeospatialIssue = FALSE,
+  limit = 10000
+)
+```
+
+### Extracción y guardado de datos
+
+```{r}
+#| label: Extracción de datos
+#| message: false
+#| warning: false
+
+# Extraer datos de presencia
+presencia <- respuesta$data
+
+# Guardar los datos de presencia en un archivo CSV
+write_csv(presencia, 'presencia.csv')
+```
+
+### Lectura de los datos de especie
+
+```{r}
+#| label: Lectura de datos
+#| message: false
+#| warning: false
+
+# Leer los datos de presencia de un archivo CSV
+presencia <- read_csv('presencia.csv')
+
+presencia <- st_as_sf(
+  presencia,
+  coords = c("decimalLongitude", "decimalLatitude"),
+  remove = FALSE, # conservar las columnas de las coordenadas
+  crs = 4326
+)
+```
+
+# Gráfico de la distribución por países de la especie Pharomachrus mocinno
+
+```{r}
+#| label: Grafico1
+#| message: false
+#| warning: false
+
+# Gráfico ggplot2
+grafico_ggplot2 <-
+  presencia |>
+  st_drop_geometry() |>
+  ggplot(aes(x = fct_infreq(countryCode))) +
+  geom_bar(
+    aes(
+      text = paste0(
+        "Cantidad de registros de presencia: ", after_stat(count)
+      )
+    )    
+  ) +
+  ggtitle("Cantidad de registros de Pharomachrus mocinno por país") +
+  xlab("País") +
+  ylab("Cantidad de registros de presencia") +
+  labs(caption = "Fuente: GBIF") +
+  theme_economist()
+
+# Gráfico plotly
+ggplotly(grafico_ggplot2, tooltip = "text") |> 
+  config(locale = 'es')
+```
+
+# Gráfico de Distribución porcentual tipo pastel de la especie Pharomachrus mocinno por Provincia en Costa Rica
+
+### Filtrado de datos para el gráfico de pastel
+
+```{r}
+#| label: Filtrado de datos
+#| message: false
+#| warning: false
+
+# Filtrar datos para Costa Rica
+presencia_cr <- presencia |> 
+  filter(countryCode == "CR")
+
+# Calcular porcentajes de distribución por provincia
+distribucion_provincia <- presencia_cr |>
+  st_drop_geometry() |>
+  group_by(stateProvince) |>
+  summarise(count = n()) |>
+  mutate(percentage = (count / sum(count)) * 100)
+
+# Filtrar el dataset para eliminar las provincias San José, Guanacaste y Puntarenas
+distribucion_provincia_filtrada <- distribucion_provincia |>
+  filter(!stateProvince %in% c("Provincia San José", "Provincia Guanacaste", "Provincia Puntarenas"),
+         !is.na(stateProvince))
+
+```
+
+### Gráfico
+
+```{r}
+#| label: Grafico2
+#| message: false
+#| warning: false
+
+# Crear gráfico tipo pie con ggplot2
+grafico_pie <-
+  distribucion_provincia_filtrada |>
+  ggplot(aes(
+    x = "", 
+    y = percentage, 
+    fill = stateProvince, 
+    text = paste0(
+      "Provincia: ", stateProvince,
+      "<br>Porcentaje: ", round(percentage, 1), "%"
+    )
+  )) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar(theta = "y") +
+  ggtitle("Distribución de registros de Pharomachrus mocinno \n por provincia en Costa Rica") +
+  geom_text(
+    aes(label = paste0(round(percentage), "%")), 
+    color = "black",
+    size = 3, # Ajustar el tamaño del texto
+    position = position_stack(vjust = 0.5) # Para ajustar la posición del texto en cada porción
+  ) +
+  scale_fill_brewer(palette = "Paired") +  # Cambiar la paleta de colores (puedes probar con otras paletas)
+  theme_void() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.title = element_blank()
+  )
+
+# Mostrar gráfico
+grafico_pie
+```
+
+# Mapa General de la distribución de la especie Pharomachrus mocinno
+
+```{r}
+#| label: Mapa1
+#| message: false
+#| warning: false
+
+# Mapa
+leaflet() |>
+  addTiles(group = "Mapa general") |>
+  addProviderTiles(
+    providers$Esri.WorldImagery, 
+    group = "Imágenes satelitales"
+  ) |>
+  addProviderTiles(
+    providers$CartoDB.Positron, 
+    group = "Mapa blanco"
+  ) |>  
+  addCircleMarkers(
+    # capa de registros de presencia (puntos)
+    data = presencia,
+    stroke = F,
+    radius = 3,
+    fillColor = 'red',
+    fillOpacity = 1,
+    popup = paste(
+      paste0("<strong>País: </strong>", presencia$country),
+      paste0("<strong>Localidad: </strong>", presencia$locality),
+      paste0("<strong>Fecha: </strong>", presencia$eventDate),
+      paste0("<strong>Fuente: </strong>", presencia$institutionCode),
+      paste0("<a href='", presencia$occurrenceID, "'>Más información</a>"),
+      sep = '<br/>'
+    ),
+    group = "Registros de Amanita muscaria"
+  ) |>
+  addLayersControl(
+    baseGroups = c("Mapa general", "Imágenes satelitales", "Mapa blanco"),
+    overlayGroups = c("Registros de Bradypus variegatus"))
+```
+
+# Mapa adicional de la distribución de la especie Pharomachrus mocinno junto con variables climáticas de precipitación y temperatura
+
+### Consulta de datos clima
+
+```{r}
+#| label: Consulta clima
+#| message: false
+#| warning: false
+
+# Consulta a WorldClim
+clima <- worldclim_global(var = 'bio', res = 10, path = tempdir())
+```
+
+```{r}
+#| label: Definición area
+#| message: false
+#| warning: false
+
+# Nombres de las variables climáticas
+names(clima)
+
+# Definir la extensión del área de estudio
+area_estudio <- ext(
+  min(presencia$decimalLongitude) - 5, 
+  max(presencia$decimalLongitude) + 5,
+  min(presencia$decimalLatitude) - 5, 
+  max(presencia$decimalLatitude) + 5
+)
+```
+
+```{r}
+#| label: Recorte de datos
+#| message: false
+#| warning: false
+
+# Recortar las variables bioclimáticas al área de estudio
+clima <- crop(clima, area_estudio)
+```
+
+```{r}
+#| label: Paletas
+#| message: false
+#| warning: false
+
+# Paleta de colores de temperatura
+colores_temperatura <- colorNumeric(
+  # palette = "inferno",
+  # palette = "magma",
+  palette = rev(brewer.pal(11, "RdYlBu")),
+  values(clima$wc2.1_10m_bio_1),
+  na.color = "transparent"
+)
+
+# Paleta de colores de precipitación
+colores_precipitacion <- colorNumeric(
+  # palette = "viridis",
+  # palette = "YlGnBu",  
+  palette = "Blues",
+  values(clima$wc2.1_10m_bio_12),
+  na.color = "transparent"
+)
+
+# Mapa
+leaflet() |>
+  addTiles(group = "Mapa general") |>
+  addProviderTiles(
+    providers$Esri.WorldImagery, 
+    group = "Imágenes satelitales"
+  ) |>  
+  addProviderTiles(
+    providers$CartoDB.Positron, 
+    group = "Mapa blanco"
+  ) |>
+  addRasterImage( # capa raster de temperatura
+    clima$wc2.1_10m_bio_1,
+    colors = colores_temperatura, # paleta de colores
+    opacity = 0.6,
+    group = "Temperatura",
+  ) |>
+  addRasterImage( # capa raster de precipitación
+    clima$wc2.1_10m_bio_12,
+    colors = colores_precipitacion, # paleta de colores
+    opacity = 0.6,
+    group = "Precipitación",
+  ) |>
+  addCircleMarkers(
+    # capa de registros de presencia (puntos)
+    data = presencia,
+    stroke = F,
+    radius = 3,
+    fillColor = 'red',
+    fillOpacity = 1,
+    popup = paste(
+      paste0("<strong>País: </strong>", presencia$country),
+      paste0("<strong>Localidad: </strong>", presencia$locality),
+      paste0("<strong>Fecha: </strong>", presencia$eventDate),
+      paste0("<strong>Fuente: </strong>", presencia$institutionCode),
+      paste0("<a href='", presencia$occurrenceID, "'>Más información</a>"),
+      sep = '<br/>'
+    ),
+    group = "Registros de Bradypus variegatus"
+  ) |>  
+  addLegend(
+    title = "Temperatura",
+    values = values(clima$wc2.1_10m_bio_1),
+    pal = colores_temperatura,
+    position = "bottomleft",
+    group = "Temperatura"
+  ) |>
+  addLegend(
+    title = "Precipitación",
+    values = values(clima$wc2.1_10m_bio_12),
+    pal = colores_precipitacion,
+    position = "bottomleft",
+    group = "Precipitación"
+  ) |>  
+  addLayersControl(
+    # control de capas
+    baseGroups = c("Mapa general", "Imágenes satelitales", "Mapa blanco"),
+    overlayGroups = c("Temperatura", "Precipitación", "Registros de Pharomachrus mocinno")
+  ) |>
+  hideGroup("Precipitación")
+```
+
+# Creación del modelo de nichos para la especie Pharomachrus mocinno
+
+```{r}
+#| label: Creación de dataframe
+#| message: false
+#| warning: false
+
+# Crear dataframe con columnas de longitud y latitud
+coordenadas_presencia <- data.frame(
+  decimalLongitude = presencia$decimalLongitude,
+  decimalLatitude = presencia$decimalLatitude
+)
+
+# Eliminar coordenadas duplicadas
+coordenadas_presencia <- unique(coordenadas_presencia)
+```
+
+```{r}
+#| label: Semilla del modelo
+#| message: false
+#| warning: false
+
+# Establecer una "semilla" para garantizar que la selección aleatoria sea reproducible
+set.seed(123)
+
+# Cantidad de registros de presencia
+n_presencia <- nrow(coordenadas_presencia)
+
+# Con sample(), se selecciona aleatoriamente una proporción (ej. 0.7) 
+# de los índices de los datos de presencia para el conjunto de entrenamiento
+indices_entrenamiento <- sample(
+  1:n_presencia, 
+  size = round(0.7 * n_presencia)
+)
+
+# Crear el subconjunto de entrenamiento utilizando los índices seleccionados
+entrenamiento <- coordenadas_presencia[indices_entrenamiento, ]
+
+# Crear el subconjunto de evaluación con los datos restantes
+evaluacion <- coordenadas_presencia[-indices_entrenamiento, ]
+```
+
+```{r}
+#| label: Aplicación de modelo
+#| message: false
+#| warning: false
+
+# Los datos de clima deben convertirse al formato que usa el paquete raster
+# debido a es este el que acepta el paquete dismo
+clima <- raster::stack(clima)
+# Ejecutar el modelo
+modelo_maxent <- maxent(x = clima, p = entrenamiento)
+
+# Aplicar el modelo entrenado a las variables climáticas 
+# para generar un mapa de idoneidad del hábitat
+prediccion <- predict(modelo_maxent, clima)
+
+```
+
+```{r}
+#| label: Resultados estadisticos
+#| message: false
+#| warning: false
+
+# terra::extract() extrae los valores del raster de predicción 
+# en las coordenadas de evaluación
+# eval_pres almacena los valores de idoneidad predichos 
+# en los puntos de evaluación de presencia
+eval_pres <- terra::extract(
+  prediccion, 
+  evaluacion[, c('decimalLongitude', 'decimalLatitude')]
+)
+
+# Generar puntos aleatorios dentro del área de estudio definida. 
+# Estos puntos se asumen como ausencias de la especie.
+ausencias <- randomPoints(mask = clima, n = 1000)
+
+# eval_aus almacena los valores de idoneidad predichos
+# en los puntos de ausencia
+eval_aus <- terra::extract(
+  prediccion, 
+  ausencias
+)
+
+# Generar estadísticas de evaluación del modelo
+resultado_evaluacion <- evaluate(p = eval_pres, a = eval_aus)
+```
+
+## Curva ROC y resultado del dato AUC del modelo para la especie Pharomachrus mocinno
+
+```{r}
+#| label: Curva ROC y AUC
+#| message: false
+#| warning: false
+
+# Datos para graficar la curva ROC
+datos_roc <- data.frame(
+  FPR = resultado_evaluacion@FPR,
+  TPR = resultado_evaluacion@TPR,
+  Umbral = resultado_evaluacion@t
+)
+
+# Valor AUC
+auc <- resultado_evaluacion@auc
+
+# Gráfico ggplot2
+grafico_ggplot2 <-
+  ggplot(
+    datos_roc, 
+    aes(
+      x = FPR, 
+      y = TPR,
+      u = Umbral
+    )
+  ) +
+  geom_line(
+    color = "blue", 
+    size = 1
+  ) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = paste("Curva ROC (AUC =", round(auc, 3), ")"),
+       x = "Tasa de falsos positivos (FPR)",
+       y = "Tasa de verdaderos positivos (TPR)") +
+  theme_minimal()
+
+# Gráfico plotly
+ggplotly(grafico_ggplot2) |> 
+  config(locale = 'es')
+```
+
+# Mapa interactivo de idoneidad para la probabilidad de encontrar la especie Pharomachrus mocinno
+
+```{r}
+#| label: Mapa2
+#| message: false
+#| warning: false
+
+# Paleta de colores del modelo
+colores_modelo <- colorNumeric(
+  palette = c("white", "black"),
+  values(prediccion),
+  na.color = "transparent"
+)
+
+# Mapa
+leaflet() |>
+  addTiles(group = "Mapa general") |>
+  addProviderTiles(
+    providers$Esri.WorldImagery, 
+    group = "Imágenes satelitales"
+  ) |>  
+  addProviderTiles(
+    providers$CartoDB.Positron, 
+    group = "Mapa blanco"
+  ) |>
+  addRasterImage( # capa raster de temperatura
+    clima$wc2.1_10m_bio_1,
+    colors = colores_temperatura, # paleta de colores
+    opacity = 0.6,
+    group = "Temperatura",
+  ) |>
+  addRasterImage( # capa raster de precipitación
+    clima$wc2.1_10m_bio_12,
+    colors = colores_precipitacion, # paleta de colores
+    opacity = 0.6,
+    group = "Precipitación",
+  ) |>
+  addRasterImage( # capa raster del modelo de distribución
+    prediccion,
+    colors = colores_modelo,
+    opacity = 0.6,
+    group = "Modelo de distribución",
+  ) |>  
+  addCircleMarkers(
+    # capa de registros de presencia (puntos)
+    data = presencia,
+    stroke = F,
+    radius = 3,
+    fillColor = 'red',
+    fillOpacity = 1,
+    popup = paste(
+      paste0("<strong>País: </strong>", presencia$country),
+      paste0("<strong>Localidad: </strong>", presencia$locality),
+      paste0("<strong>Fecha: </strong>", presencia$eventDate),
+      paste0("<strong>Fuente: </strong>", presencia$institutionCode),
+      paste0("<a href='", presencia$occurrenceID, "'>Más información</a>"),
+      sep = '<br/>'
+    ),
+    group = "Registros de Bradypus variegatus"
+  ) |>  
+  addLegend(
+    title = "Temperatura",
+    values = values(clima$wc2.1_10m_bio_1),
+    pal = colores_temperatura,
+    position = "bottomleft",
+    group = "Temperatura"
+  ) |>
+  addLegend(
+    title = "Precipitación",
+    values = values(clima$wc2.1_10m_bio_12),
+    pal = colores_precipitacion,
+    position = "bottomleft",
+    group = "Precipitación"
+  ) |>
+  addLegend(
+    title = "Modelo de distribución",
+    values = values(prediccion),
+    pal = colores_modelo,
+    position = "bottomright",
+    group = "Modelo de distribución"
+  ) |>  
+  addLayersControl(
+    # control de capas
+    baseGroups = c("Mapa general", "Imágenes satelitales", "Mapa blanco"),
+    overlayGroups = c(
+      "Temperatura",
+      "Precipitación",
+      "Modelo de distribución",
+      "Registros de Pharomachrus mocinno"
+    )
+  ) |>
+  hideGroup("Temperatura") |>
+  hideGroup("Precipitación")
+```
+
+# Mapa de idoneidad binario para la especie Pharomachrus mocinno
+
+```{r}
+#| label: Mapa3
+#| message: false
+#| warning: false
+
+# Definir el umbral
+umbral <- 0.5
+
+# Crear el raster binario
+prediccion_binaria <- (prediccion >= umbral) * 1
+
+# Crear la paleta de colores para el raster binario
+colores_prediccion_binaria <- colorFactor(
+  palette = c("transparent", "blue"),  # "transparent" para las áreas no adecuadas
+  domain = c(0, 1),
+  na.color = "transparent"
+)
+
+# Mapa
+leaflet() |>
+  addTiles(group = "Mapa general") |>
+  addProviderTiles(
+    providers$Esri.WorldImagery, 
+    group = "Imágenes satelitales"
+  ) |>
+  addProviderTiles(
+    providers$CartoDB.Positron, 
+    group = "Mapa blanco"
+  ) |>
+  addRasterImage(
+    prediccion_binaria,
+    colors = colores_prediccion_binaria,
+    opacity = 0.6,
+    group = "Modelo de distribución binario",
+  ) |>
+  addCircleMarkers(
+    data = presencia,
+    stroke = FALSE,
+    radius = 3,
+    fillColor = 'red',
+    fillOpacity = 1,
+    popup = paste(
+      paste0("<strong>País: </strong>", presencia$country),
+      paste0("<strong>Localidad: </strong>", presencia$locality),
+      paste0("<strong>Fecha: </strong>", presencia$eventDate),
+      paste0("<strong>Fuente: </strong>", presencia$institutionCode),
+      paste0("<a href='", presencia$occurrenceID, "'>Más información</a>"),
+      sep = '<br/>'
+    ),
+    group = "Registros de Bradypus variegatus"
+  ) |>
+  addLegend(
+    title = "Modelo de distribución binario",
+    labels = c("Ausencia", "Presencia"),
+    colors = c("transparent", "blue"),
+    position = "bottomright",
+    group = "Modelo de distribución binario"
+  ) |>
+  addLayersControl(
+    baseGroups = c("Mapa general", "Imágenes satelitales", "Mapa blanco"),
+    overlayGroups = c(
+      "Modelo de distribución binario",
+      "Registros de Pharomachrus mocinno"
+    )
+  )
+```
+
+# Mapa adicional del modelo con las capas ERA5 de precipitación y la capa de altitud de terra 
+
+
