@@ -1,10 +1,11 @@
 ---
 title: "Tarea 3 Modelo de nicho de la especie Pharomachrus mocinno (Quetzal)"
-format: html
 author: Mariana de los Ángeles Morales Morales
-theme: minty
-toc: true
-toc_depth: 2
+format:
+  html:
+    toc: true
+    toc_float: true
+    theme: minty
 ---
 
 ### Instalación de paquetes
